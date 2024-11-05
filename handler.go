@@ -384,14 +384,18 @@ func (h *TextHandler) appendAttr(buf []byte, a slog.Attr, hs *handleState) []byt
 		buf = fmt.Appendf(buf, "%s%s%s", h.valueColors.Duration, formattedDuration, h.resetMod)
 	case slog.KindGroup:
 		attrs := a.Value.Group()
+		grLen := len(attrs)
 		// Ignore empty groups.
-		if len(attrs) == 0 {
+		if grLen == 0 {
 			return buf
 		}
 		hss := hs.clone()
 		hss.CurrentGroupName = h.appendCurrentGroupName(hss.CurrentGroupName, a.Key)
-		for _, ga := range attrs {
+		for i, ga := range attrs {
 			buf = h.appendAttr(buf, ga, hss)
+			if i < grLen-1 {
+				buf = fmt.Appendf(buf, "%s%s%s", h.symbolMod, h.attrAttrSeparator, h.resetMod)
+			}
 		}
 	case slog.KindAny:
 		errVal, ok := a.Value.Any().(error)

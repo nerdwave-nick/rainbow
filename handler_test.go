@@ -13,7 +13,9 @@ import (
 )
 
 func attrRE(attr *slog.Attr, opts *rainbow.Options, pgr string) string {
-	attr.Value = attr.Value.Resolve()
+	if attr.Value.Kind() != slog.KindGroup {
+		attr.Value = attr.Value.Resolve()
+	}
 	rstring := pgr + keyRE(attr.Key, opts)
 	switch attr.Value.Kind() {
 	case slog.KindString:
@@ -37,9 +39,13 @@ func attrRE(attr *slog.Attr, opts *rainbow.Options, pgr string) string {
 	case slog.KindGroup:
 		group := attr.Value.Group()
 		grK := pgr + grRE(attr.Key, opts)
-		grS := ""
-		for _, attr := range group {
+		grS := "" // "THIS IS A GROUP WITH KEY " + attr.Key
+		grLen := len(group)
+		for i, attr := range group {
 			grS = grS + attrRE(&attr, opts, grK)
+			if i < grLen-1 {
+				grS = grS + string(opts.SymbolOverride) + opts.AttrAttrSeparator + string(opts.ResetOverride)
+			}
 		}
 		return grS
 
@@ -151,7 +157,7 @@ var opts = rainbow.Options{
 			"error": "<keo>",
 		},
 		GroupMap: map[string]rainbow.AnsiMod{
-			"testgroup": "<gt>",
+			"gr": "<tgr>",
 		},
 	},
 	SpecialOverrides: &rainbow.SpecialColorOverrides{
@@ -362,6 +368,17 @@ func TestRainbow_HandlerWithGroup(t *testing.T) {
 				),
 			},
 		},
+		{
+			LogLevel: slog.LevelError,
+			Message:  "Testing Attributes",
+			Attrs: []slog.Attr{
+				slog.String("some", "attribute"),
+				slog.Group("gr",
+					slog.Duration("dk", 12*time.Second),
+					slog.Duration("dk", 12*time.Second),
+				),
+			},
+		},
 	}
 
 	for i, tt := range tests {
@@ -406,7 +423,7 @@ func TestRainbow_HandlerWithGroupManual(t *testing.T) {
 					}{1, "2"}),
 				),
 			},
-			ManualExpectedRegexp: regexp.MustCompile(`^<t>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}<ro><le>\|ERR <ro><m>Testing Attributes<ro><so><mas><ro><kd>wg<ro><so>\.<ro><kd>some<ro><so>=<ro><vs>"attribute"<ro><so><aas><ro><kd>wg<ro><so>\.<ro><kd>i64k<ro><so>=<ro><vi>23<ro><so><aas><ro><kd>wg<ro><so>\.<ro><kd>ik<ro><so>=<ro><vi>23<ro><so><aas><ro><kd>wg<ro><so>\.<ro><kd>bk<ro><so>=<ro><vb>true<ro><so><aas><ro><kd>wg<ro><so>\.<ro><kd>fk<ro><so>=<ro><vf>324\.2<ro><so><aas><ro><kd>wg<ro><so>\.<ro><kd>dk<ro><so>=<ro><vd>12s<ro><so><aas><ro><kd>wg<ro><so>\.<ro><kd>gr<ro><so>\.<ro><kd>tk<ro><so>=<ro><vt>1970-01-01T01:00:01\.001<ro><kd>wg<ro><so>\.<ro><kd>gr<ro><so>\.<ro><ke>err<ro><so>=<ro><ve>err<ro><kd>wg<ro><so>\.<ro><kd>gr<ro><so>\.<ro><kd>rk<ro><so>=<ro><va>\{1 2\}<ro>\n$`),
+			ManualExpectedRegexp: regexp.MustCompile(`^<t>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}<ro><le>\|ERR <ro><m>Testing Attributes<ro><so><mas><ro><kd>wg<ro><so>\.<ro><kd>some<ro><so>=<ro><vs>"attribute"<ro><so><aas><ro><kd>wg<ro><so>\.<ro><kd>i64k<ro><so>=<ro><vi>23<ro><so><aas><ro><kd>wg<ro><so>\.<ro><kd>ik<ro><so>=<ro><vi>23<ro><so><aas><ro><kd>wg<ro><so>\.<ro><kd>bk<ro><so>=<ro><vb>true<ro><so><aas><ro><kd>wg<ro><so>\.<ro><kd>fk<ro><so>=<ro><vf>324\.2<ro><so><aas><ro><kd>wg<ro><so>\.<ro><kd>dk<ro><so>=<ro><vd>12s<ro><so><aas><ro><kd>wg<ro><so>\.<ro><tgr>gr<ro><so>\.<ro><kd>tk<ro><so>=<ro><vt>1970-01-01T01:00:01\.001<ro><so><aas><ro><kd>wg<ro><so>\.<ro><tgr>gr<ro><so>\.<ro><ke>err<ro><so>=<ro><ve>err<ro><so><aas><ro><kd>wg<ro><so>\.<ro><tgr>gr<ro><so>\.<ro><kd>rk<ro><so>=<ro><va>\{1 2\}<ro>\n$`),
 		},
 	}
 
@@ -454,7 +471,7 @@ func TestRainbow_HandlerWithGroupManualNoColor(t *testing.T) {
 					}{1, "2"}),
 				),
 			},
-			ManualExpectedRegexp: regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}\|ERR Testing Attributes<mas>wg\.some="attribute"<aas>wg\.i64k=23<aas>wg\.ik=23<aas>wg\.bk=true<aas>wg\.fk=324\.2<aas>wg\.dk=12s<aas>wg\.gr\.tk=1970-01-01T01:00:01\.001wg\.gr\.err=errwg\.gr\.rk=\{1 2\}\n$`),
+			ManualExpectedRegexp: regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}\|ERR Testing Attributes<mas>wg\.some="attribute"<aas>wg\.i64k=23<aas>wg\.ik=23<aas>wg\.bk=true<aas>wg\.fk=324\.2<aas>wg\.dk=12s<aas>wg\.gr\.tk=1970-01-01T01:00:01\.001<aas>wg\.gr\.err=err<aas>wg\.gr\.rk=\{1 2\}\n$`),
 		},
 	}
 
@@ -472,3 +489,6 @@ func TestRainbow_HandlerWithGroupManualNoColor(t *testing.T) {
 		})
 	}
 }
+
+// ERR Testing Attributes<mas>wg.some=\"attribute\"<aas>wg.i64k=23<aas>wg.ik=23<aas>wg.bk=true<aas>wg.fk=324.2<aas>wg.dk=12s<aas>wg.gr.tk=1970-01-01T01:00:01.001<aas>wg.gr.err=err<aas>wg.gr.rk={1 2}\n
+// ERR Testing Attributes<mas>wg.some=\"attribute\"<aas>wg.i64k=23<aas>wg.ik=23<aas>wg.bk=true<aas>wg.fk=324.2<aas>wg.dk=12s<aas>wg.gr.tk=1970-01-01T01:00:01.001wg.gr.err=errwg.gr.rk={1 2}\n
