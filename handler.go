@@ -302,12 +302,20 @@ func (h *TextHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 		freeBuf(bufp)
 	}()
 
+	separator := ""
+	if h2.baseState.PreformattedAttributes != "" {
+		separator = fmt.Sprintf("%s%s%s", h.symbolMod, h.attrAttrSeparator, h.resetMod)
+	}
 	// write attributes to buffer
-	for _, attr := range attrs {
+	length := len(attrs)
+	for i, attr := range attrs {
 		attr.Value = attr.Value.Resolve()
 		buf = h2.appendAttr(buf, attr, &h2.baseState)
+		if i < length-1 {
+			buf = fmt.Appendf(buf, "%s%s%s", h.symbolMod, h.attrAttrSeparator, h.resetMod)
+		}
 	}
-	h2.baseState.PreformattedAttributes = h2.baseState.PreformattedAttributes + string(buf)
+	h2.baseState.PreformattedAttributes = h2.baseState.PreformattedAttributes + separator + string(buf)
 	return h2
 }
 
